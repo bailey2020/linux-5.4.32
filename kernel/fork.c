@@ -1101,6 +1101,15 @@ void mmput(struct mm_struct *mm)
 }
 EXPORT_SYMBOL_GPL(mmput);
 
+/*
+ * retian memory vma with VM_RETAIN_ON_EXEC flag
+ */
+void retain_memory_vma(struct mm_struct *old_mm, struct mm_struct *mm)
+{
+       might_sleep();
+       set_retain_memory_vma(old_mm, mm);
+}
+
 #ifdef CONFIG_MMU
 static void mmput_async_fn(struct work_struct *work)
 {

@@ -48,7 +48,8 @@
 		| MAP_HUGETLB \
 		| MAP_32BIT \
 		| MAP_HUGE_2MB \
-		| MAP_HUGE_1GB)
+		| MAP_HUGE_1GB \
+		| MAP_RETAIN_ON_EXEC)
 
 extern int sysctl_overcommit_memory;
 extern int sysctl_overcommit_ratio;

@@ -77,4 +77,6 @@ static inline int get_dumpable(struct mm_struct *mm)
 #define MMF_INIT_MASK		(MMF_DUMPABLE_MASK | MMF_DUMP_FILTER_MASK |\
 				 MMF_DISABLE_THP_MASK)
 
+#define MMF_VM_RETAIN_ON_EXEC   28      /* retain memory on exec */
+
 #endif /* _LINUX_SCHED_COREDUMP_H */
