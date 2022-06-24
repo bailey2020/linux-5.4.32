@@ -3430,6 +3430,53 @@ out:
 	return NULL;
 }
 
+int vma_dup(struct vm_area_struct *old_vma, struct mm_struct *mm)
+{
+	unsigned long npages;
+	struct mm_struct *old_mm = old_vma->vm_mm;
+	struct vm_area_struct *vma;
+	int ret = -ENOMEM;
+
+	if (WARN_ON(old_vma->vm_file || old_vma->vm_ops))
+		return -EINVAL;
+
+	vma = find_vma(mm, old_vma->vm_start);
+	if (vma && vma->vm_start < old_vma->vm_end)
+		return -EEXIST;
+
+	npages = vma_pages(old_vma);
+	mm->total_vm += npages;
+
+	vma = vm_area_dup(old_vma);
+	if (!vma)
+		goto fail_nomem;
+
+	ret = vma_dup_policy(old_vma, vma);
+	if (ret)
+		goto fail_nomem_policy;
+
+	vma->vm_mm = mm;
+	ret = anon_vma_fork(vma, old_vma);
+	if (ret)
+		goto fail_nomem_anon_vma_fork;
+
+	vma->vm_flags &= ~(VM_LOCKED|VM_UFFD_MISSING|VM_UFFD_WP|VM_EXEC_KEEP);
+	vma->vm_next = vma->vm_prev = NULL;
+	vma->vm_userfaultfd_ctx = NULL_VM_UFFD_CTX;
+	if (is_vm_hugetlb_page(vma))
+		reset_vma_resv_huge_pages(vma);
+	__insert_vm_struct(mm, vma);
+	ret = copy_page_range(mm, old_mm, old_vma);
+	return ret;
+
+fail_nomem_anon_vma_fork:
+	mpol_put(vma_policy(vma));
+fail_nomem_policy:
+	vm_area_free(vma);
+fail_nomem:
+	return -ENOMEM;
+}
+
 /*
  * Return true if the calling process may expand its vm space by the passed
  * number of pages
