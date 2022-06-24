@@ -3299,6 +3299,10 @@ void set_retain_memory_vma(struct mm_struct *old_mm, struct mm_struct *mm)
 					"mem retain: dup_vm_area failed, ret %d", ret);
 				break;
 			}
+
+			mm->total_vm += vma_pages(vma);
+			if (is_data_mapping(vma->vm_flags))
+				mm->data_vm += vma_pages(vma);
 		}
 		vma = vma->vm_next;
 	}
