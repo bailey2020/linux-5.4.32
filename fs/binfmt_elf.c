@@ -682,6 +682,81 @@ out:
 	return error;
 }
 
+#define NOTES_SZ			SZ_1K
+#define PRESERVED_MEM_OK_STRING		"preserved-mem-ok"
+#define SZ_PRESERVED_MEM_OK_STRING	sizeof(PRESERVED_MEM_OK_STRING)
+static int parse_elf_note(struct linux_binprm *bprm, const char *data, size_t *off, size_t datasz)
+{
+	const struct elf_note *nhdr;
+	const char *name;
+	size_t o;
+
+	o = *off;
+	datasz -= o;
+
+	if (datasz < sizeof(*nhdr))
+		return -ENOEXEC;
+
+	nhdr = (const struct elf_note *)(data + o);
+	o += sizeof(*nhdr);
+	datasz -= sizeof(*nhdr);
+
+	/*
+	 * Currently only the preserved-mem-ok elf note is of interest.
+	 */
+	if (nhdr->n_type != 0x07c1feed)
+		goto next;
+
+	if (nhdr->n_namesz > SZ_PRESERVED_MEM_OK_STRING)
+		return -ENOEXEC;
+
+	name =  data + o;
+	if (datasz < SZ_PRESERVED_MEM_OK_STRING ||
+			strncmp(name, PRESERVED_MEM_OK_STRING, SZ_PRESERVED_MEM_OK_STRING))
+		return -ENOEXEC;
+
+	bprm->accepts_preserved_mem = 1;
+
+next:
+	o += roundup(nhdr->n_namesz, 4) + roundup(nhdr->n_descsz, 4);
+	*off = o;
+
+	return 0;
+}
+
+static int parse_elf_notes(struct linux_binprm *bprm, struct elf_phdr *phdr)
+{
+	char *notes;
+	size_t notes_sz;
+	size_t off = 0;
+	int ret;
+
+	if (!phdr)
+		return 0;
+
+	notes_sz = phdr->p_filesz;
+	if ((notes_sz > NOTES_SZ) || (notes_sz < sizeof(struct elf_note)))
+		return -ENOEXEC;
+
+	notes = kvmalloc(notes_sz, GFP_KERNEL);
+	if (!notes)
+		return -ENOMEM;
+
+	ret = elf_read(bprm->file, notes, notes_sz, phdr->p_offset);
+	if (ret < 0)
+		goto out;
+
+	while (off < notes_sz) {
+		ret = parse_elf_note(bprm, notes, &off, notes_sz);
+		if (ret)
+			break;
+	}
+
+out:
+	kvfree(notes);
+	return ret;
+}
+
 /*
  * These are the functions used to load ELF style executables and shared
  * libraries.  There is no binary dependent code anywhere else.
@@ -800,6 +875,7 @@ static int load_elf_binary(struct linux_binprm *bprm)
 	unsigned long error;
 	struct elf_phdr *elf_ppnt, *elf_phdata, *interp_elf_phdata = NULL;
 	struct elf_phdr *elf_property_phdata = NULL;
+	struct elf_phdr *elf_notes_phdata = NULL;
 	unsigned long elf_bss, elf_brk;
 	int bss_prot = 0;
 	int retval, i;
@@ -910,6 +986,10 @@ out_free_interp:
 				executable_stack = EXSTACK_DISABLE_X;
 			break;
 
+		case PT_NOTE:
+			elf_notes_phdata = elf_ppnt;
+			break;
+
 		case PT_LOPROC ... PT_HIPROC:
 			retval = arch_elf_pt_proc(elf_ex, elf_ppnt,
 						  bprm->file, false,
@@ -968,6 +1048,10 @@ out_free_interp:
 	retval = arch_check_elf(elf_ex,
 				!!interpreter, &loc->interp_elf_ex,
 				&arch_state);
+	if (retval)
+		goto out_free_dentry;
+
+	retval = parse_elf_notes(bprm, elf_notes_phdata);
 	if (retval)
 		goto out_free_dentry;
 

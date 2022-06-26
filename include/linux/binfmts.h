@@ -50,7 +50,13 @@ struct linux_binprm {
 		 * This is past the point of no return, when the
 		 * exec_update_mutex has been taken.
 		 */
-		called_exec_mmap:1;
+		called_exec_mmap:1,
+
+		/*
+		 * Set if the binary being exec'd will accept memory marked
+		 * for preservation by the outgoing process.
+		 */
+		accepts_preserved_mem:1;
 #ifdef __alpha__
 	unsigned int taso:1;
 #endif

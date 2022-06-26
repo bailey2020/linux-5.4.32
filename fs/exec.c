@@ -1031,10 +1031,11 @@ static int vma_dup_some(struct mm_struct *old_mm, struct mm_struct *new_mm)
  * On success, this function returns with the mutex
  * exec_update_mutex locked.
  */
-static int exec_mmap(struct mm_struct *mm)
+static int exec_mmap(struct linux_binprm *bprm)
 {
 	struct task_struct *tsk;
 	struct mm_struct *old_mm, *active_mm;
+	struct mm_struct *mm = bprm->mm;
 	int ret;
 
 	/* Notify parent that we're no longer interested in the old VM */
@@ -1061,9 +1062,14 @@ static int exec_mmap(struct mm_struct *mm)
 			return -EINTR;
 		}
 
-		ret = vma_dup_some(old_mm, mm);
-		if (ret) {
-			printk("exec: vma dup some failed %d\n", ret);
+		if (bprm->accepts_preserved_mem) {
+			ret = vma_dup_some(old_mm, mm);
+			if (ret) {
+				printk("exec: vma dup some failed %d\n", ret);
+				mmap_read_unlock(old_mm);
+				mutex_unlock(&tsk->signal->exec_update_mutex);
+				return ret;
+			}
 		}
 
 		if (test_bit(MMF_VM_RETAIN_ON_EXEC, &old_mm->flags)) {
@@ -1321,7 +1327,7 @@ int begin_new_exec(struct linux_binprm * bprm)
 	 * Release all of the old mmap stuff
 	 */
 	acct_arg_size(bprm, 0);
-	retval = exec_mmap(bprm->mm);
+	retval = exec_mmap(bprm);
 	if (retval)
 		goto out;
 
