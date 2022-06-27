@@ -1017,12 +1017,19 @@ static int vma_dup_some(struct mm_struct *old_mm, struct mm_struct *new_mm)
 	struct vm_area_struct *vma;
 	int ret;
 
-	for (vma = old_mm->mmap; vma; vma = vma->vm_next)
+	for (vma = old_mm->mmap; vma; vma = vma->vm_next) {
 		if (vma->vm_flags & VM_EXEC_KEEP) {
+			printk(KERN_INFO "vma dup some: find keep vma(0x%lx, 0x%lx)\n",
+						vma->vm_start, vma->vm_end);
 			ret = vma_dup(vma, new_mm);
-			if (ret)
+			if (ret) {
+				printk(KERN_ERR
+					"vma keep: dup_vm_area failed, ret %d", ret);
 				return ret;
+			}
 		}
+	}
+
 	return 0;
 }
 
