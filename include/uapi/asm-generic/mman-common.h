@@ -27,6 +27,7 @@
 #define MAP_HUGETLB		0x040000	/* create a huge page mapping */
 #define MAP_SYNC		0x080000 /* perform synchronous page faults for the mapping */
 #define MAP_FIXED_NOREPLACE	0x100000	/* MAP_FIXED which doesn't unmap underlying mapping */
+#define MAP_EXEC_KEEP   	0x400000        /* preserve on exec */
 
 #define MAP_RETAIN_ON_EXEC      0x800000        /* map retain on exec used for living update */
 

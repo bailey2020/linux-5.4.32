@@ -1566,6 +1566,11 @@ unsigned long do_mmap(struct file *file, unsigned long addr,
 		}
 	}
 
+	if (flags & MAP_EXEC_KEEP) {
+		vm_flags |= VM_EXEC_KEEP;
+		set_bit(MMF_VM_EXEC_KEEP, &mm->flags);
+	}
+
 	/*
 	 * Set 'VM_NORESERVE' if we should not account for the
 	 * memory use of this mapping.
@@ -3444,9 +3449,6 @@ int vma_dup(struct vm_area_struct *old_vma, struct mm_struct *mm)
 	struct vm_area_struct *vma;
 	int ret = -ENOMEM;
 
-	if (WARN_ON(old_vma->vm_file || old_vma->vm_ops))
-		return -EINVAL;
-
 	vma = find_vma(mm, old_vma->vm_start);
 	if (vma && vma->vm_start < old_vma->vm_end) {
 		printk("vma keep: find vma overlap start 0x%lx, end 0x%lx\n",
@@ -3456,6 +3458,8 @@ int vma_dup(struct vm_area_struct *old_vma, struct mm_struct *mm)
 
 	npages = vma_pages(old_vma);
 	mm->total_vm += npages;
+	if (is_data_mapping(old_vma->vm_flags))
+		mm->data_vm += npages;
 
 	vma = vm_area_dup(old_vma);
 	if (!vma)
@@ -3474,7 +3478,7 @@ int vma_dup(struct vm_area_struct *old_vma, struct mm_struct *mm)
 		goto fail_nomem_anon_vma_fork;
 	}
 
-	vma->vm_flags &= ~(VM_LOCKED|VM_UFFD_MISSING|VM_UFFD_WP|VM_EXEC_KEEP);
+	vma->vm_flags &= ~(VM_LOCKED|VM_UFFD_MISSING|VM_UFFD_WP);
 	vma->vm_next = vma->vm_prev = NULL;
 	vma->vm_userfaultfd_ctx = NULL_VM_UFFD_CTX;
 	file = vma->vm_file;

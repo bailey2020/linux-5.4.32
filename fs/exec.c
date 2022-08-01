@@ -1069,7 +1069,8 @@ static int exec_mmap(struct linux_binprm *bprm)
 			return -EINTR;
 		}
 
-		if (bprm->accepts_preserved_mem) {
+		if (bprm->accepts_preserved_mem ||
+					test_bit(MMF_VM_EXEC_KEEP, &old_mm->flags)) {
 			ret = vma_dup_some(old_mm, mm);
 			if (ret) {
 				printk("exec: vma dup some failed %d\n", ret);
@@ -1077,6 +1078,7 @@ static int exec_mmap(struct linux_binprm *bprm)
 				mutex_unlock(&tsk->signal->exec_update_mutex);
 				return ret;
 			}
+			printk("exec: vma dup some succeed\n");
 		}
 
 		if (test_bit(MMF_VM_RETAIN_ON_EXEC, &old_mm->flags)) {
